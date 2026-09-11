@@ -1,6 +1,6 @@
 ## =============================================================================
-## WEBLEM-III: Differential Gene Expression Analysis of Breast Tumor vs Normal
-##             Tissue using RNA-seq (GSE183947)
+## Project Title: Differential Gene Expression Analysis of Breast Tumor vs Normal
+##                Tissue using RNA-seq (GSE183947)
 ##
 ## Pipeline: Data acquisition -> Metadata reshaping -> Count matrix construction
 ##           -> DESeq2 DGE analysis -> Visualization -> Functional enrichment
