@@ -1,4 +1,4 @@
-# Differential Gene Expression Analysis — Breast Tumor vs Normal (RNA-seq)
+# Differential Gene Expression Analysis - Breast Tumor vs Normal (RNA-seq)
 
 ## Introduction
 RNA sequencing enables sensitive, genome-wide quantification of gene
