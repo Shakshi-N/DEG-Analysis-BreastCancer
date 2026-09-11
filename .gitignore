@@ -1,0 +1,27 @@
+# Data files (large, download from GEO instead)
+data/*.csv
+data/*.txt.gz
+data/*.rds
+
+# R session / history
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.toc
+docs/*.bbl
+docs/*.blg
+docs/*.synctex.gz
+
+# Results (regenerate via script; comment out if you want to track them)
+# results/plots/*.png
+# results/tables/*.csv

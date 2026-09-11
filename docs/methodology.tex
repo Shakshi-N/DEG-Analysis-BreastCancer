@@ -1,0 +1,177 @@
+\documentclass[12pt]{article}
+\usepackage{times}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[justification=raggedright,singlelinecheck=false,font=small]{caption}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{setspace}
+\usepackage{booktabs}
+
+\setstretch{1.15}
+\sloppy
+
+\title{Differential Gene Expression Analysis of Breast Tumor and Normal Tissue \\
+Using Bulk RNA-Sequencing Data}
+\date{}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent RNA sequencing (RNA-seq) enables high-throughput quantification of gene
+expression across the transcriptome. Here, differential expression analysis was
+performed on a public breast cancer RNA-seq dataset (GEO accession GSE183947,
+$n=60$; 30 tumor and 30 matched normal samples) to identify differentially
+expressed genes (DEGs) between tumor and normal tissue. Significant DEGs were
+identified using DESeq2, characterized functionally via Gene Ontology (GO) and
+KEGG pathway enrichment, and evaluated as classification features using a
+Random Forest model.
+\end{abstract}
+
+\section{Introduction}
+RNA-seq has revolutionized transcriptome analysis by enabling high-throughput quantification of gene expression across the entire genome (1). Compared to microarrays, RNA-seq offers greater sensitivity and the ability to detect novel transcripts and alternative splicing events (2). These advantages make RNA-seq an indispensable tool for investigating the molecular mechanisms underlying health and disease.
+A central application of RNA-seq is the identification of differentially expressed genes (DEGs), which reflect transcriptional alterations between biological states such as tumor and normal tissue (3).
+
+\subsection{FPKM normalization}
+FPKM (Fragments Per Kilobase of transcript per Million mapped reads) is a
+normalization metric commonly used in RNA-seq experiments. The number of reads
+mapped to a gene reflects its expression level, but raw read counts cannot be
+directly compared across genes or samples due to differences in sequencing
+depth and gene length. FPKM normalizes expression data by accounting for both:
+\begin{itemize}
+  \item \textbf{Sequencing depth} - dividing by the total number of mapped reads.
+  \item \textbf{Gene length} - dividing by transcript length in kilobases.
+\end{itemize}
+
+\section{Dataset}
+The RNA-seq dataset GSE183947 was retrieved from the NCBI Gene Expression
+Omnibus (GEO) database. This dataset comprises 60 samples of breast tissue,
+including 30 breast tumor and 30 normal tissue samples. The dataset was
+already pre-normalized in FPKM units, which were rounded and transformed into
+integer counts before DESeq2 analysis.
+
+\section{Tools Required}
+\begin{itemize}
+  \item \textbf{R programming} - used to perform all steps of differential
+        expression analysis (DEG identification, normalization, statistical
+        testing), functional enrichment, and visualization.
+  \item \textbf{DESeq2} - for identifying DEGs from count-based sequence data.
+  \item \textbf{clusterProfiler} - functional enrichment analysis, including
+        Gene Ontology (GO) and KEGG pathway analysis.
+  \item \textbf{enrichR} - disease association, tissue enrichment, and
+        pathway analysis.
+  \item \textbf{ggplot2} - boxplots, volcano plots, MA plots.
+  \item \textbf{pheatmap} - clustered heatmaps of DEGs.
+  \item \textbf{randomForest} - machine learning models using normalized
+        expression values of top DEGs to classify/rank important genes.
+  \item \textbf{GEOquery} - downloading the expression matrix and metadata
+        from the GEO database.
+\end{itemize}
+
+\section{Methodology}
+
+\subsection{Data acquisition and preparation}
+The RNA-seq dataset (60 samples: 30 tumor, 30 normal) was imported into R.
+Phenotypic and experimental annotations for the dataset were retrieved using
+the \texttt{pData(phenoData(...))} function. Metadata provided group
+information differentiating 30 tumor versus 30 normal samples.
+
+\subsection{Metadata processing and reshaping}
+Relevant columns were selected and renamed for clarity (tissue and metastasis
+status). The raw FPKM matrix was converted from wide format to long format
+using \texttt{gather()}, creating a table with one row per gene-sample pair.
+The long-format expression data was then merged with the cleaned metadata
+based on sample identifiers.
+
+\subsection{Count matrix and sample information}
+DESeq2 requires integer counts. FPKM values were rounded to the nearest
+integer to generate an approximate count matrix. The cleaned metadata was used
+to create a sample information table, where each sample was assigned to a
+condition label: Tumor or Normal. Sample ordering between the count matrix and
+sample information table was explicitly verified before model construction.
+
+\subsection{Differential gene expression analysis}
+A \texttt{DESeqDataSet} was constructed from the integer count matrix and
+sample information table, with the design formula $\sim \text{condition}$.
+Genes with extremely low expression across samples (row sum $< 10$) were
+filtered out to reduce noise. DESeq2's internal normalization procedure was
+applied, and a negative binomial generalized linear model (GLM) was fit to
+each gene. Genes with an adjusted $p$-value (Benjamini--Hochberg) $\leq 0.05$
+and an absolute $\log_2$ fold change $\geq 1$ were considered significantly
+differentially expressed.
+
+\subsection{Visualization}
+Boxplots of the top five DEGs (ranked by adjusted $p$-value) were generated
+using DESeq2-normalized, $\log_2$-transformed counts, stratified by condition.
+A volcano plot was constructed by plotting $\log_2$ fold change against
+$-\log_{10}$(adjusted $p$-value), highlighting upregulated and downregulated
+genes. An MA plot and a clustered heatmap of the top 50 DEGs (Euclidean
+distance, complete linkage, row-scaled) were additionally generated to assess
+overall expression patterns between conditions.
+
+\subsection{Functional enrichment analysis}
+Gene Ontology (GO) Biological Process enrichment was performed on upregulated
+genes using \texttt{clusterProfiler}. KEGG pathway and disease/tissue
+enrichment analyses were additionally performed using \texttt{enrichR} on both
+upregulated and downregulated gene sets.
+
+\subsection{Machine learning-based classification using top DEGs}
+\label{sec:ml}
+To evaluate the discriminative potential of the identified DEGs, a Random
+Forest classifier was trained using a nested design in which DEG selection
+and test-set evaluation are kept fully separated, ensuring that no
+information from held-out samples influences which genes are chosen or how
+expression values are normalized.
+
+\begin{enumerate}
+  \item \textbf{Train/test split:} All 60 samples were partitioned into 70\%
+        training and 30\% testing sets using stratified sampling
+        (\texttt{caret::createDataPartition}), performed \emph{before} any
+        differential expression analysis for the classification pipeline.
+  \item \textbf{Training-only DEG selection:} DESeq2 was run using only the
+        training samples; the top 10 genes (ranked by adjusted $p$-value)
+        from this training-only fit were used as classifier features. This
+        keeps feature selection blind to the test partition, so that the
+        genes chosen are not influenced by the very samples later used to
+        evaluate the model.
+  \item \textbf{Feature construction:} Training-set features were the
+        DESeq2-normalized, $\log_2$-transformed counts from the
+        training-only fit, joined to samples by sample identifier (rather
+        than row position, which would risk silent sample/label
+        misalignment). Test-set samples were normalized independently,
+        against the training set's reference geometric means
+        (via \texttt{estimateSizeFactorsForMatrix()}), so that no
+        information from the test set - including its own normalization - entered feature selection or scaling at any point.
+  \item \textbf{Model training:} A Random Forest classifier was trained with
+        500 trees ($n_{\text{tree}} = 500$) on the training features.
+  \item \textbf{Model evaluation:} Predicted class labels were generated for
+        the held-out test set, and classification performance was assessed
+        using a confusion matrix.
+  \item \textbf{Feature importance:} Gene importance was computed using the
+        Mean Decrease in Gini index from the trained model.
+  \item \textbf{Visualization:} Feature importance was visualized as a
+        horizontal bar plot using \texttt{ggplot2}.
+  \item \textbf{Cross-validation robustness check:} Because a single 70/30
+        split is evaluated on only $\sim$18 test samples - where a single misclassification changes accuracy by roughly six percentage points - the identical nested procedure (stratified split, training-only DEG selection, training-referenced test normalization, Random Forest training and evaluation) was additionally repeated across
+        5-fold cross-validation with 5 repeats (25 total fold fits), independently reselecting the top DEGs within each fold's training partition. Mean accuracy, sensitivity, and specificity across folds, together with their standard deviations, were reported alongside the single-split result to characterize the variability of the
+        performance estimate.
+\end{enumerate}
+
+Note that the DESeq2 results reported in the differential expression and
+enrichment sections above (Sections~4--6) use the full 60-sample dataset, as
+is standard practice for exploratory DEG discovery; the nested, sample-split
+design described here applies specifically to the machine learning
+evaluation, where a genuinely held-out accuracy estimate is required.
+
+\section*{References}
+\begin{enumerate}
+  \item Wang, Z., Gerstein, M., Snyder, M. RNA-Seq: a revolutionary tool for
+  transcriptomics. Nature Reviews Genetics. 2009;10:57--63.
+  \item Ozsolak, F., Milos, P.M. RNA sequencing: advances, challenges and
+  opportunities. Nature Reviews Genetics. 2011;12:87--98.
+  \item Love, M.I., Huber, W., Anders, S. Moderated estimation of fold change
+  and dispersion for RNA-seq data with DESeq2. Genome Biology.
+  2014;15:550.
+\end{enumerate}
+
+\end{document}
